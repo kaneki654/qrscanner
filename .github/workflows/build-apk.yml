@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -13,14 +13,15 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
+        cache: 'pip'
 
-    - name: Install Buildozer and dependencies
+    - name: Install system dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -37,16 +38,38 @@ jobs:
             libtinfo5 \
             cmake \
             libffi-dev \
-            libssl-dev
+            libssl-dev \
+            libxml2-dev \
+            libxslt-dev
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
         pip install buildozer cython virtualenv
 
     - name: Build APK with Buildozer
       run: |
-        buildozer android debug
+        # Initialize buildozer if spec doesn't exist
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+        fi
+        
+        # Build the APK
+        buildozer -v android debug
+        
+        # List generated files
         ls -la bin/
 
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: qr-scanner-pro-apk
         path: bin/*.apk
+        if-no-files-found: error
+        retention-days: 7
+
+    - name: Show build info
+      run: |
+        echo "Build completed!"
+        echo "APK files:"
+        ls -la bin/*.apk 2>/dev/null || echo "No APK files found"
